@@ -1,8 +1,25 @@
+import { db } from '../db';
+import { usersTable } from '../db/schema';
 import { type IdInput, type User } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function getUserById(input: IdInput): Promise<User | null> {
-    // This is a placeholder implementation! Real code should be implemented here.
-    // The goal of this handler is fetching a specific user by ID from the database,
-    // with proper authorization checks to ensure the requesting user has permission.
-    return null;
-}
+export const getUserById = async (input: IdInput): Promise<User | null> => {
+  try {
+    // Query user by ID
+    const result = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.id, input.id))
+      .execute();
+
+    // Return null if user not found
+    if (result.length === 0) {
+      return null;
+    }
+
+    // Return the user (no numeric conversions needed for this schema)
+    return result[0];
+  } catch (error) {
+    console.error('Get user by ID failed:', error);
+    throw error;
+  }
+};

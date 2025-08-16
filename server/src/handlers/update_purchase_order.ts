@@ -1,20 +1,56 @@
+import { db } from '../db';
+import { purchaseOrdersTable } from '../db/schema';
 import { type UpdatePurchaseOrderInput, type PurchaseOrder } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function updatePurchaseOrder(input: UpdatePurchaseOrderInput): Promise<PurchaseOrder> {
-    // This is a placeholder implementation! Real code should be implemented here.
-    // The goal of this handler is updating a purchase order with proper authorization checks.
-    // Users can only update purchase orders they created (except BSP and DAU who can update any).
-    // Status updates should follow the proper workflow validation.
-    return Promise.resolve({
-        id: input.id,
-        po_number: 'PO-' + input.id,
-        title: input.title || 'Placeholder Title',
-        description: input.description || null,
-        requested_by: 1,
-        approved_by: null,
-        status: input.status || 'DRAFT',
-        total_amount: input.total_amount || 0,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as PurchaseOrder);
-}
+export const updatePurchaseOrder = async (input: UpdatePurchaseOrderInput): Promise<PurchaseOrder> => {
+  try {
+    // First, verify the purchase order exists
+    const existingPO = await db.select()
+      .from(purchaseOrdersTable)
+      .where(eq(purchaseOrdersTable.id, input.id))
+      .execute();
+
+    if (existingPO.length === 0) {
+      throw new Error(`Purchase order with ID ${input.id} not found`);
+    }
+
+    // Build update object with only provided fields
+    const updateData: any = {
+      updated_at: new Date()
+    };
+
+    if (input.title !== undefined) {
+      updateData.title = input.title;
+    }
+
+    if (input.description !== undefined) {
+      updateData.description = input.description;
+    }
+
+    if (input.total_amount !== undefined) {
+      updateData.total_amount = input.total_amount.toString(); // Convert number to string for numeric column
+    }
+
+    if (input.status !== undefined) {
+      updateData.status = input.status;
+    }
+
+    // Update the purchase order
+    const result = await db.update(purchaseOrdersTable)
+      .set(updateData)
+      .where(eq(purchaseOrdersTable.id, input.id))
+      .returning()
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    const updatedPO = result[0];
+    return {
+      ...updatedPO,
+      total_amount: parseFloat(updatedPO.total_amount) // Convert string back to number
+    };
+  } catch (error) {
+    console.error('Purchase order update failed:', error);
+    throw error;
+  }
+};

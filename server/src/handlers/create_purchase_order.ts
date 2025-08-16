@@ -1,20 +1,38 @@
+import { db } from '../db';
+import { purchaseOrdersTable } from '../db/schema';
 import { type CreatePurchaseOrderInput, type PurchaseOrder } from '../schema';
 
-export async function createPurchaseOrder(input: CreatePurchaseOrderInput): Promise<PurchaseOrder> {
-    // This is a placeholder implementation! Real code should be implemented here.
-    // The goal of this handler is creating a new purchase order with auto-generated PO number,
-    // setting the requesting user based on authentication context, and initial status as DRAFT.
-    // All roles except ADMIN can create purchase orders.
-    return Promise.resolve({
-        id: 1,
-        po_number: 'PO-' + Date.now(),
+export const createPurchaseOrder = async (input: CreatePurchaseOrderInput): Promise<PurchaseOrder> => {
+  try {
+    // Generate a unique PO number using timestamp
+    const poNumber = `PO-${Date.now()}`;
+    
+    // For now, we'll use a hardcoded user ID (1) as requested_by
+    // In a real implementation, this would come from authentication context
+    const requestedBy = 1;
+
+    // Insert purchase order record
+    const result = await db.insert(purchaseOrdersTable)
+      .values({
+        po_number: poNumber,
         title: input.title,
         description: input.description,
-        requested_by: 1, // Should be set from auth context
+        requested_by: requestedBy,
         approved_by: null,
         status: 'DRAFT',
-        total_amount: input.total_amount,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as PurchaseOrder);
-}
+        total_amount: input.total_amount.toString(), // Convert number to string for numeric column
+      })
+      .returning()
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    const purchaseOrder = result[0];
+    return {
+      ...purchaseOrder,
+      total_amount: parseFloat(purchaseOrder.total_amount), // Convert string back to number
+    };
+  } catch (error) {
+    console.error('Purchase order creation failed:', error);
+    throw error;
+  }
+};
